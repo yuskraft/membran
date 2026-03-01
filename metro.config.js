@@ -1,10 +1,17 @@
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
 /**
- * Metro configuration for iOS/Android.
- * For macOS, use metro.config.macos.js.
+ * Metro configuration.
+ * The 'macos' entry in platforms lets Metro resolve *.macos.tsx files
+ * regardless of which port the bundler is started on.
  * https://reactnative.dev/docs/metro
  */
-const config = {};
+const defaultConfig = getDefaultConfig(__dirname);
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+const config = {
+  resolver: {
+    platforms: [...(defaultConfig.resolver?.platforms ?? []), 'macos'],
+  },
+};
+
+module.exports = mergeConfig(defaultConfig, config);

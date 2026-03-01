@@ -1,21 +1,10 @@
 /**
- * Metro configuration for macOS.
- * react-native-macos uses a separate Metro config so it can resolve
- * the macOS platform overrides (*.macos.tsx / *.macos.ts files).
+ * Metro configuration for macOS bundler (port 8082).
+ * Re-exports the shared config, which already includes the 'macos' platform
+ * resolver. Use this file explicitly if you need macos-only Metro overrides
+ * in the future.
  *
- * Run the macOS bundler with:
- *   npm run start:macos   (port 8082, separate from the iOS/Android bundler)
+ *   npm run start:macos
  */
 
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
-
-const defaultConfig = getDefaultConfig(__dirname);
-
-const config = {
-  resolver: {
-    // Allow Metro to resolve macOS-specific platform files
-    platforms: [...(defaultConfig.resolver?.platforms ?? []), 'macos'],
-  },
-};
-
-module.exports = mergeConfig(defaultConfig, config);
+module.exports = require('./metro.config');

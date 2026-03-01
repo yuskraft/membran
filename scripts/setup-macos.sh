@@ -31,8 +31,9 @@ echo "→ Installing JS dependencies..."
 npm install
 
 # 3. Generate the macos/ Xcode project via react-native-macos-init
+#    Version must match react-native-macos in package.json (0.81.x)
 echo "→ Running react-native-macos-init..."
-npx react-native-macos-init --overwrite
+npx react-native-macos-init@0.81 --overwrite
 
 # 4. Install CocoaPods dependencies
 echo "→ Installing CocoaPods..."
