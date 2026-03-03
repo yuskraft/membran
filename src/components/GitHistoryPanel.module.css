@@ -1,0 +1,65 @@
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.commit {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.commit:last-child {
+  border-bottom: none;
+}
+
+.commitMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hash {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  color: var(--accent);
+  background: rgba(0, 112, 243, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hash {
+    background: rgba(59, 130, 246, 0.12);
+  }
+}
+
+.author {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.date {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.message {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.empty {
+  padding: 20px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}

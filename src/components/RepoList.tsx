@@ -1,13 +1,24 @@
-import { RepoInfo } from '../types';
+import { RepoInfo, RunScript } from '../types';
 import RepoCard from './RepoCard';
 import styles from './RepoList.module.css';
 
 interface Props {
   repos: RepoInfo[];
   hasRootPaths: boolean;
+  runningProcesses: Set<string>;
+  onRun: (id: string, path: string, script: RunScript) => void;
+  onStop: (id: string) => void;
+  onSelect: (repo: RepoInfo) => void;
 }
 
-export default function RepoList({ repos, hasRootPaths }: Props) {
+export default function RepoList({
+  repos,
+  hasRootPaths,
+  runningProcesses,
+  onRun,
+  onStop,
+  onSelect,
+}: Props) {
   if (!hasRootPaths) {
     return (
       <div className={styles.empty}>
@@ -33,7 +44,14 @@ export default function RepoList({ repos, hasRootPaths }: Props) {
   return (
     <div className={styles.grid}>
       {repos.map((repo) => (
-        <RepoCard key={repo.path} {...repo} />
+        <RepoCard
+          key={repo.path}
+          repo={repo}
+          runningProcesses={runningProcesses}
+          onRun={onRun}
+          onStop={onStop}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );

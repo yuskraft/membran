@@ -1,0 +1,123 @@
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar-bg);
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.portLink {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'SF Mono', ui-monospace, monospace;
+  color: var(--accent);
+  background: rgba(0, 112, 243, 0.1);
+  border: 1px solid rgba(0, 112, 243, 0.25);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.portLink:hover {
+  background: rgba(0, 112, 243, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  .portLink {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+  .portLink:hover {
+    background: rgba(59, 130, 246, 0.25);
+  }
+}
+
+.stopBtn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+.stopBtn:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.log {
+  height: 180px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: 'SF Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  background: var(--main-bg);
+}
+
+.logEmpty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.line {
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.lineError {
+  color: #ef4444;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lineError {
+    color: #f87171;
+  }
+}
