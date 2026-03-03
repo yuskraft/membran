@@ -42,6 +42,7 @@ pub struct RepoInfo {
     pub scripts: Vec<RunScript>,
     pub nested_projects: Vec<NestedProject>,
     pub dist_size_bytes: Option<u64>,
+    pub mfe: Option<MfeInfo>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -70,6 +71,22 @@ pub struct PackageInfo {
     pub dev_dep_count: usize,
     pub dep_versions: BTreeMap<String, String>,
     pub dev_dep_versions: BTreeMap<String, String>,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct MfeRemote {
+    pub name: String,
+    pub url: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct MfeInfo {
+    pub is_host: bool,
+    pub is_remote: bool,
+    pub framework: String,
+    pub name: Option<String>,
+    pub remotes: Vec<MfeRemote>,
+    pub exposes: Vec<String>,
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -151,6 +168,7 @@ where
             scripts: collect_node_scripts(dir),
             nested_projects: find_nested_projects(dir),
             dist_size_bytes: compute_dist_size(dir),
+            mfe: detect_mfe(dir),
         });
         return;
     }
@@ -577,6 +595,189 @@ fn dir_bytes(dir: &Path) -> u64 {
         }
     }
     total
+}
+
+// ── Micro-frontend detection ──────────────────────────────────────────────────
+
+fn detect_mfe(path: &Path) -> Option<MfeInfo> {
+    for file in &[
+        "webpack.config.js",
+        "webpack.config.ts",
+        "module-federation.config.js",
+        "module-federation.config.ts",
+    ] {
+        if let Ok(content) = fs::read_to_string(path.join(file)) {
+            if let Some(info) = parse_mfe_config(&content, "webpack") {
+                return Some(info);
+            }
+        }
+    }
+    for file in &["vite.config.ts", "vite.config.js", "vite.config.mjs"] {
+        if let Ok(content) = fs::read_to_string(path.join(file)) {
+            if let Some(info) = parse_mfe_config(&content, "vite") {
+                return Some(info);
+            }
+        }
+    }
+    None
+}
+
+fn parse_mfe_config(content: &str, framework: &str) -> Option<MfeInfo> {
+    let is_mfe = if framework == "vite" {
+        content.contains("federation(")
+    } else {
+        content.contains("ModuleFederationPlugin")
+    };
+    if !is_mfe {
+        return None;
+    }
+
+    let remotes_block = extract_js_block(content, "remotes");
+    let exposes_block = extract_js_block(content, "exposes");
+    let is_host = remotes_block.is_some();
+    let is_remote = exposes_block.is_some();
+
+    let remotes = remotes_block
+        .map(|b| {
+            b.lines()
+                .filter_map(|line| {
+                    let (key, val) = extract_js_key_value(line.trim())?;
+                    let url = val
+                        .map(|v| {
+                            // Webpack format: "remoteName@https://host/remoteEntry.js"
+                            if let Some(at) = v.rfind('@') {
+                                v[at + 1..].to_string()
+                            } else {
+                                v
+                            }
+                        })
+                        .filter(|u| u.contains("://") || u.starts_with('/'));
+                    Some(MfeRemote { name: key, url })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let exposes = exposes_block
+        .map(|b| {
+            b.lines()
+                .filter_map(|line| {
+                    let (key, _) = extract_js_key_value(line.trim())?;
+                    if key.starts_with("./") || key.starts_with('/') {
+                        Some(key)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Some(MfeInfo {
+        is_host,
+        is_remote,
+        framework: framework.to_string(),
+        name: extract_quoted_after_key(content, "name"),
+        remotes,
+        exposes,
+    })
+}
+
+/// Find `key: { ... }` in JS/TS text and return the inner block.
+/// The `{` must appear within 80 bytes of the key to avoid false matches.
+fn extract_js_block(content: &str, key: &str) -> Option<String> {
+    let pos = content
+        .find(&format!("\"{}\":", key))
+        .or_else(|| content.find(&format!("{}:", key)))?;
+    // The opening '{' must be close to the key
+    let window_end = (pos + 80).min(content.len());
+    let window = &content[pos..window_end];
+    let brace_offset = window.find('{')?;
+    let after = &content[pos + brace_offset + 1..];
+    // Count matching braces
+    let mut depth = 1i32;
+    let mut end = after.len();
+    for (i, c) in after.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = i;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let block = after[..end].to_string();
+    if block.trim().is_empty() {
+        None
+    } else {
+        Some(block)
+    }
+}
+
+/// Return the first quoted string value following `key:` in content.
+fn extract_quoted_after_key(content: &str, key: &str) -> Option<String> {
+    for pattern in &[format!("\"{}\":", key), format!("{}:", key)] {
+        if let Some(pos) = content.find(pattern.as_str()) {
+            let after = content[pos + pattern.len()..].trim_start();
+            let q = match after.chars().next()? {
+                '\'' => '\'',
+                '"' => '"',
+                _ => continue,
+            };
+            let inner = &after[1..];
+            if let Some(end) = inner.find(q) {
+                return Some(inner[..end].to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Extract key and optional quoted value from a single JS object property line.
+fn extract_js_key_value(line: &str) -> Option<(String, Option<String>)> {
+    let line = line.trim().trim_end_matches(',');
+    if line.is_empty()
+        || line.starts_with("//")
+        || line.starts_with("/*")
+        || line.starts_with('*')
+        || line == "{"
+        || line == "}"
+    {
+        return None;
+    }
+
+    let (key, rest): (String, &str) = if line.starts_with('"') || line.starts_with('\'') {
+        let q = line.chars().next()?;
+        let after_q = &line[1..];
+        let close = after_q.find(q)?;
+        let key = after_q[..close].to_string();
+        let rest = after_q[close + 1..].trim().strip_prefix(':')?.trim();
+        (key, rest)
+    } else {
+        let colon = line.find(':')?;
+        let key = line[..colon].trim().to_string();
+        let rest = line[colon + 1..].trim();
+        (key, rest)
+    };
+
+    if key.is_empty() || key.contains('{') || key.contains('}') || key.contains(' ') {
+        return None;
+    }
+
+    let value = if rest.starts_with('"') || rest.starts_with('\'') {
+        let q = rest.chars().next()?;
+        let inner = &rest[1..];
+        let end = inner.find(q)?;
+        Some(inner[..end].to_string())
+    } else {
+        None
+    };
+
+    Some((key, value))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

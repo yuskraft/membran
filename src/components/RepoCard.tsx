@@ -19,10 +19,18 @@ export default function RepoCard({
   onStop,
   onSelect,
 }: RepoCardProps) {
-  const { name, path, git, health, packages, scripts, nested_projects } = repo;
+  const { name, path, git, health, packages, scripts, nested_projects, mfe } = repo;
   const totalDeps = packages ? packages.dep_count + packages.dev_dep_count : null;
   const primaryScript = scripts[0] ?? null;
   const isRunning = runningProcesses.has(path);
+  const mfeLabel =
+    mfe && mfe.is_host && mfe.is_remote
+      ? 'HOST+REMOTE'
+      : mfe?.is_host
+        ? 'HOST'
+        : mfe?.is_remote
+          ? 'REMOTE'
+          : null;
 
   return (
     <div
@@ -31,6 +39,19 @@ export default function RepoCard({
     >
       <div className={styles.header}>
         <span className={styles.badge}>git</span>
+        {mfeLabel && (
+          <span
+            className={`${styles.mfeBadge} ${
+              mfeLabel === 'HOST'
+                ? styles.mfeHost
+                : mfeLabel === 'REMOTE'
+                  ? styles.mfeRemote
+                  : styles.mfeHub
+            }`}
+          >
+            {mfeLabel}
+          </span>
+        )}
         <span className={styles.name} title={name}>
           {name}
         </span>

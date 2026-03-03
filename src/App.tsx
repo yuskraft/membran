@@ -9,6 +9,7 @@ import HealthView from './components/HealthView';
 import DepsView from './components/DepsView';
 import RunningView from './components/RunningView';
 import DashboardView from './components/DashboardView';
+import MfeView from './components/MfeView';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorBanner from './components/ErrorBanner';
 import SettingsPage from './components/SettingsPage';
@@ -51,6 +52,20 @@ function normalizeRepo(raw: any): RepoInfo {
         }
       : null,
     scripts: raw.scripts ?? [],
+    mfe: raw.mfe
+      ? {
+          is_host: raw.mfe.is_host ?? false,
+          is_remote: raw.mfe.is_remote ?? false,
+          framework: raw.mfe.framework ?? 'unknown',
+          name: raw.mfe.name ?? null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          remotes: (raw.mfe.remotes ?? []).map((r: any) => ({
+            name: r.name ?? '',
+            url: r.url ?? null,
+          })),
+          exposes: raw.mfe.exposes ?? [],
+        }
+      : null,
     nested_projects: (raw.nested_projects ?? []).map(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (np: any) => ({
@@ -238,6 +253,10 @@ function App() {
           onNavigate={(v) => setView(v)}
         />
       );
+    }
+
+    if (view === 'mfe') {
+      return <MfeView repos={repos} onSelectRepo={(repo) => setSelectedRepo(repo)} />;
     }
 
     if (view === 'health') {

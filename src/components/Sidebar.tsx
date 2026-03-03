@@ -26,6 +26,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'health', label: 'Health' },
       { id: 'deps', label: 'Dependencies' },
+      { id: 'mfe', label: 'Micro Frontends' },
     ],
   },
   {
@@ -52,11 +53,13 @@ export default function Sidebar({
   // Compute badge counts for nav items
   const healthIssues = repos.filter((r) => r.health.score < 50).length;
   const depMismatches = countDepMismatches(repos);
+  const mfeCount = repos.filter((r) => r.mfe !== null).length;
 
   const badgeFor = (id: View): number | null => {
     if (id === 'health' && healthIssues > 0) return healthIssues;
     if (id === 'deps' && depMismatches > 0) return depMismatches;
     if (id === 'running' && runningCount > 0) return runningCount;
+    if (id === 'mfe' && mfeCount > 0) return mfeCount;
     return null;
   };
 

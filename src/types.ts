@@ -43,6 +43,20 @@ export interface NestedProject {
   scripts: RunScript[];
 }
 
+export interface MfeRemote {
+  name: string;
+  url: string | null;
+}
+
+export interface MfeInfo {
+  is_host: boolean;
+  is_remote: boolean;
+  framework: string;
+  name: string | null;
+  remotes: MfeRemote[];
+  exposes: string[];
+}
+
 export interface RepoInfo {
   name: string;
   path: string;
@@ -54,6 +68,7 @@ export interface RepoInfo {
   scripts: RunScript[];
   nested_projects: NestedProject[];
   dist_size_bytes: number | null;
+  mfe: MfeInfo | null;
 }
 
 export interface OutdatedPackage {
@@ -83,4 +98,4 @@ export interface ProcessEntry {
   lines: OutputLine[];
 }
 
-export type View = 'home' | 'repos' | 'running' | 'health' | 'deps' | 'settings';
+export type View = 'home' | 'repos' | 'running' | 'health' | 'deps' | 'mfe' | 'settings';

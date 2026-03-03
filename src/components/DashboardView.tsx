@@ -83,6 +83,7 @@ export default function DashboardView({
     0,
   );
   const nodeRepos = repos.filter((r) => r.packages !== null).length;
+  const mfeCount = repos.filter((r) => r.mfe !== null).length;
 
   const worstRepos = [...repos].sort((a, b) => a.health.score - b.health.score).slice(0, 5);
 
@@ -126,6 +127,18 @@ export default function DashboardView({
           >
             <span className={`${styles.statValue} ${styles.running}`}>{runningCount}</span>
             <span className={styles.statLabel}>Running</span>
+          </div>
+        )}
+        {mfeCount > 0 && (
+          <div
+            className={`${styles.statCard} ${styles.statCardMfe}`}
+            onClick={() => onNavigate('mfe')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onNavigate('mfe')}
+          >
+            <span className={`${styles.statValue} ${styles.mfe}`}>{mfeCount}</span>
+            <span className={styles.statLabel}>Micro Frontends</span>
           </div>
         )}
       </div>

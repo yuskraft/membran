@@ -75,6 +75,15 @@
   background: rgba(34, 197, 94, 0.05);
 }
 
+.statCardMfe {
+  cursor: pointer;
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.statCardMfe:hover {
+  background: rgba(124, 58, 237, 0.05);
+}
+
 @media (prefers-color-scheme: dark) {
   .statCardAccent {
     border-color: rgba(59, 130, 246, 0.3);
@@ -111,6 +120,11 @@
 .mid  { color: var(--health-mid); }
 .low  { color: var(--health-low); }
 .running { color: var(--health-high); }
+.mfe     { color: #7c3aed; }
+
+@media (prefers-color-scheme: dark) {
+  .mfe { color: #a78bfa; }
+}
 
 /* ── Two-column grid ── */
 .grid {
