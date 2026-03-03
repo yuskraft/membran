@@ -98,8 +98,8 @@ function countDepMismatches(repos: RepoInfo[]): number {
   for (const repo of repos) {
     if (!repo.packages) continue;
     const all = {
-      ...repo.packages.dep_versions,
-      ...repo.packages.dev_dep_versions,
+      ...(repo.packages.dep_versions ?? {}),
+      ...(repo.packages.dev_dep_versions ?? {}),
     };
     for (const [name, version] of Object.entries(all)) {
       if (!depVersions.has(name)) depVersions.set(name, new Set());

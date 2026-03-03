@@ -13,6 +13,58 @@ import ErrorBanner from './components/ErrorBanner';
 import SettingsPage from './components/SettingsPage';
 import styles from './App.module.css';
 
+/**
+ * Fill in defaults for any fields that may be missing from old cached repos
+ * stored before a schema change. Prevents crashes when accessing new fields
+ * on data deserialized from the SQLite cache.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeRepo(raw: any): RepoInfo {
+  return {
+    name: raw.name ?? '',
+    path: raw.path ?? '',
+    last_modified: raw.last_modified ?? null,
+    git: {
+      branch: raw.git?.branch ?? null,
+      last_commit_msg: raw.git?.last_commit_msg ?? null,
+      last_commit_date: raw.git?.last_commit_date ?? null,
+    },
+    git_log: raw.git_log ?? [],
+    health: {
+      score: raw.health?.score ?? 0,
+      has_node_modules: raw.health?.has_node_modules ?? false,
+      has_lockfile: raw.health?.has_lockfile ?? false,
+      has_typescript: raw.health?.has_typescript ?? false,
+      typescript_strict: raw.health?.typescript_strict ?? false,
+      has_eslint: raw.health?.has_eslint ?? false,
+      has_ci: raw.health?.has_ci ?? false,
+      has_tests: raw.health?.has_tests ?? false,
+      node_modules_ignored: raw.health?.node_modules_ignored ?? false,
+    },
+    packages: raw.packages
+      ? {
+          dep_count: raw.packages.dep_count ?? 0,
+          dev_dep_count: raw.packages.dev_dep_count ?? 0,
+          dep_versions: raw.packages.dep_versions ?? {},
+          dev_dep_versions: raw.packages.dev_dep_versions ?? {},
+        }
+      : null,
+    scripts: raw.scripts ?? [],
+    nested_projects: (raw.nested_projects ?? []).map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (np: any) => ({
+        id: np.id ?? np.path ?? '',
+        name: np.name ?? '',
+        path: np.path ?? '',
+        project_type: np.project_type ?? 'unknown',
+        scripts: np.scripts ?? [],
+      }),
+    ),
+    dist_size_bytes: raw.dist_size_bytes ?? null,
+  };
+}
+
+
 function App() {
   const [view, setView] = useState<View>('repos');
   const [rootPaths, setRootPaths] = useState<string[]>([]);
@@ -30,17 +82,16 @@ function App() {
 
     const setup = async () => {
       const unlistenFound = await listen<RepoInfo>('repo-found', (e) => {
+        const repo = normalizeRepo(e.payload);
         setRepos((prev) => {
-          const idx = prev.findIndex((r) => r.path === e.payload.path);
+          const idx = prev.findIndex((r) => r.path === repo.path);
           if (idx >= 0) {
             const next = [...prev];
-            next[idx] = e.payload;
-            setSelectedRepo((sel) =>
-              sel?.path === e.payload.path ? e.payload : sel,
-            );
+            next[idx] = repo;
+            setSelectedRepo((sel) => (sel?.path === repo.path ? repo : sel));
             return next;
           }
-          return [...prev, e.payload];
+          return [...prev, repo];
         });
       });
 
@@ -71,7 +122,7 @@ function App() {
 
         if (root_paths.length > 0) {
           const cached = await invoke<RepoInfo[]>('get_cached_repos').catch(() => []);
-          if (cached.length > 0) setRepos(cached);
+          if (cached.length > 0) setRepos(cached.map(normalizeRepo));
 
           setScanning(true);
           invoke('start_scan', { rootPaths: root_paths }).catch((e) => {
