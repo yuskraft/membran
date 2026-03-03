@@ -65,4 +65,22 @@ export interface OutdatedPackage {
 
 export type OutdatedResult = Record<string, OutdatedPackage>;
 
-export type View = 'repos' | 'summary' | 'health' | 'deps' | 'settings';
+export interface ProcessInfo {
+  id: string;
+  name: string;
+  path: string;
+  command: string;
+}
+
+export interface OutputLine {
+  line: string;
+  is_error: boolean;
+}
+
+export interface ProcessEntry {
+  info: ProcessInfo;
+  ports: number[];
+  lines: OutputLine[];
+}
+
+export type View = 'repos' | 'running' | 'summary' | 'health' | 'deps' | 'settings';

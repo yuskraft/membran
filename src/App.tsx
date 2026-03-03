@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { RepoInfo, RunScript, View } from './types';
+import { RepoInfo, RunScript, View, ProcessInfo, ProcessEntry } from './types';
 import Sidebar from './components/Sidebar';
 import RepoList from './components/RepoList';
 import RepoDetailDrawer from './components/RepoDetailDrawer';
 import HealthView from './components/HealthView';
 import DepsView from './components/DepsView';
+import RunningView from './components/RunningView';
 import HealthSummary from './components/HealthSummary';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorBanner from './components/ErrorBanner';
@@ -72,9 +73,11 @@ function App() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [runningProcesses, setRunningProcesses] = useState<Set<string>>(new Set());
+  const [processEntries, setProcessEntries] = useState<Record<string, ProcessEntry>>({});
   const [selectedRepo, setSelectedRepo] = useState<RepoInfo | null>(null);
   const initialized = useRef(false);
+
+  const runningProcesses = new Set(Object.keys(processEntries));
 
   useEffect(() => {
     if (initialized.current) return;
@@ -104,15 +107,40 @@ function App() {
         setScanning(false);
       });
 
-      const unlistenStarted = await listen<string>('process-started', (e) => {
-        setRunningProcesses((prev) => new Set(prev).add(e.payload));
+      const unlistenStarted = await listen<ProcessInfo>('process-started', (e) => {
+        setProcessEntries((prev) => ({
+          ...prev,
+          [e.payload.id]: { info: e.payload, ports: [], lines: [] },
+        }));
       });
 
       const unlistenStopped = await listen<string>('process-stopped', (e) => {
-        setRunningProcesses((prev) => {
-          const next = new Set(prev);
-          next.delete(e.payload);
+        setProcessEntries((prev) => {
+          const next = { ...prev };
+          delete next[e.payload];
           return next;
+        });
+      });
+
+      const unlistenOutput = await listen<{ id: string; line: string; is_error: boolean }>(
+        'process-output',
+        (e) => {
+          const { id, line, is_error } = e.payload;
+          setProcessEntries((prev) => {
+            if (!prev[id]) return prev;
+            const entry = prev[id];
+            const lines = [...entry.lines, { line, is_error }].slice(-500);
+            return { ...prev, [id]: { ...entry, lines } };
+          });
+        },
+      );
+
+      const unlistenPort = await listen<{ id: string; port: number }>('process-port', (e) => {
+        const { id, port } = e.payload;
+        setProcessEntries((prev) => {
+          if (!prev[id] || prev[id].ports.includes(port)) return prev;
+          const entry = prev[id];
+          return { ...prev, [id]: { ...entry, ports: [...entry.ports, port] } };
         });
       });
 
@@ -140,6 +168,8 @@ function App() {
         unlistenError();
         unlistenStarted();
         unlistenStopped();
+        unlistenOutput();
+        unlistenPort();
       };
     };
 
@@ -154,7 +184,7 @@ function App() {
   }, []);
 
   const handleRunProject = (id: string, path: string, script: RunScript) => {
-    invoke('run_project', { id, path, command: script.command }).catch((e) =>
+    invoke('run_project', { id, path, name: script.name, command: script.command }).catch((e) =>
       setError(String(e)),
     );
   };
@@ -186,6 +216,16 @@ function App() {
   const renderMain = () => {
     if (view === 'settings') {
       return <SettingsPage rootPaths={rootPaths} onSave={handleSaveRootPaths} />;
+    }
+
+    if (view === 'running') {
+      return (
+        <RunningView
+          processEntries={processEntries}
+          repos={repos}
+          onStop={handleStopProject}
+        />
+      );
     }
 
     if (view === 'summary') {
@@ -256,7 +296,7 @@ function App() {
         repos={repos}
         scanning={scanning}
         runningCount={runningProcesses.size}
-        onViewChange={setView}
+        onViewChange={(v) => setView(v)}
       />
 
       <main className={styles.main}>

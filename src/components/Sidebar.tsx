@@ -17,6 +17,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Overview',
     items: [
       { id: 'repos', label: 'Repositories' },
+      { id: 'running', label: 'Running' },
       { id: 'summary', label: 'Summary' },
     ],
   },
@@ -55,7 +56,7 @@ export default function Sidebar({
   const badgeFor = (id: View): number | null => {
     if (id === 'health' && healthIssues > 0) return healthIssues;
     if (id === 'deps' && depMismatches > 0) return depMismatches;
-    if (id === 'repos' && runningCount > 0) return runningCount;
+    if (id === 'running' && runningCount > 0) return runningCount;
     return null;
   };
 
