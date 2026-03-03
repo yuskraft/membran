@@ -1,19 +1,44 @@
-import { RepoInfo } from '../types';
+import { RepoInfo, RunScript } from '../types';
 import HealthBar from './HealthBar';
+import RunButton from './RunButton';
+import NestedProjectList from './NestedProjectList';
 import styles from './RepoCard.module.css';
 
-export default function RepoCard({ name, path, git, health, packages }: RepoInfo) {
-  const totalDeps = packages
-    ? packages.dep_count + packages.dev_dep_count
-    : null;
+interface RepoCardProps {
+  repo: RepoInfo;
+  runningProcesses: Set<string>;
+  onRun: (id: string, path: string, script: RunScript) => void;
+  onStop: (id: string) => void;
+}
+
+export default function RepoCard({
+  repo,
+  runningProcesses,
+  onRun,
+  onStop,
+}: RepoCardProps) {
+  const { name, path, git, health, packages, scripts, nested_projects } = repo;
+  const totalDeps = packages ? packages.dep_count + packages.dev_dep_count : null;
+  const primaryScript = scripts[0] ?? null;
+  const isRunning = runningProcesses.has(path);
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${isRunning ? styles.cardRunning : ''}`}>
       <div className={styles.header}>
         <span className={styles.badge}>git</span>
         <span className={styles.name} title={name}>
           {name}
         </span>
+        {primaryScript && (
+          <RunButton
+            id={path}
+            path={path}
+            script={primaryScript}
+            isRunning={isRunning}
+            onRun={onRun}
+            onStop={onStop}
+          />
+        )}
       </div>
 
       <span className={styles.path} title={path}>
@@ -22,9 +47,7 @@ export default function RepoCard({ name, path, git, health, packages }: RepoInfo
 
       {(git.branch || git.last_commit_msg) && (
         <div className={styles.gitRow}>
-          {git.branch && (
-            <span className={styles.branch}>{git.branch}</span>
-          )}
+          {git.branch && <span className={styles.branch}>{git.branch}</span>}
           {git.last_commit_msg && (
             <span className={styles.commit} title={git.last_commit_msg}>
               {git.last_commit_msg}
@@ -45,6 +68,13 @@ export default function RepoCard({ name, path, git, health, packages }: RepoInfo
           <span className={styles.deps}>{totalDeps} deps</span>
         )}
       </div>
+
+      <NestedProjectList
+        projects={nested_projects}
+        runningProcesses={runningProcesses}
+        onRun={onRun}
+        onStop={onStop}
+      />
     </div>
   );
 }

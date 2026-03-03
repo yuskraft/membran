@@ -2,10 +2,15 @@ mod database;
 mod repo_scanner;
 
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 
 struct DbPath(PathBuf);
+
+struct ProcessManager(Arc<Mutex<HashMap<String, Child>>>);
 
 #[tauri::command]
 fn get_settings(db_path: State<DbPath>) -> Result<Value, String> {
@@ -57,6 +62,67 @@ fn start_scan(
     Ok(())
 }
 
+#[tauri::command]
+fn run_project(
+    id: String,
+    path: String,
+    command: String,
+    app: tauri::AppHandle,
+    processes: State<ProcessManager>,
+) -> Result<(), String> {
+    // Stop any existing process for this id before starting a new one
+    {
+        let mut map = processes.0.lock().map_err(|e| e.to_string())?;
+        if let Some(mut existing) = map.remove(&id) {
+            let _ = existing.kill();
+        }
+    }
+
+    // Parse the command into program + args
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err("empty command".to_string());
+    }
+    let program = parts[0];
+    let args = &parts[1..];
+
+    let child = Command::new(program)
+        .args(args)
+        .current_dir(&path)
+        .spawn()
+        .map_err(|e| format!("failed to start '{command}': {e}"))?;
+
+    {
+        let mut map = processes.0.lock().map_err(|e| e.to_string())?;
+        map.insert(id.clone(), child);
+    }
+
+    let _ = app.emit("process-started", &id);
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_project(
+    id: String,
+    app: tauri::AppHandle,
+    processes: State<ProcessManager>,
+) -> Result<(), String> {
+    let mut map = processes.0.lock().map_err(|e| e.to_string())?;
+    if let Some(mut child) = map.remove(&id) {
+        child.kill().map_err(|e| e.to_string())?;
+        let _ = app.emit("process-stopped", &id);
+        Ok(())
+    } else {
+        Err(format!("no running process for id: {id}"))
+    }
+}
+
+#[tauri::command]
+fn get_running_processes(processes: State<ProcessManager>) -> Result<Vec<String>, String> {
+    let map = processes.0.lock().map_err(|e| e.to_string())?;
+    Ok(map.keys().cloned().collect())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -80,6 +146,7 @@ pub fn run() {
             drop(conn);
 
             app.manage(DbPath(db_file));
+            app.manage(ProcessManager(Arc::new(Mutex::new(HashMap::new()))));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -87,6 +154,9 @@ pub fn run() {
             save_root_paths,
             get_cached_repos,
             start_scan,
+            run_project,
+            stop_project,
+            get_running_processes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

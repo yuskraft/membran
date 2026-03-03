@@ -20,6 +20,19 @@ export interface PackageInfo {
   dev_dep_count: number;
 }
 
+export interface RunScript {
+  name: string;
+  command: string;
+}
+
+export interface NestedProject {
+  id: string;
+  name: string;
+  path: string;
+  project_type: string;
+  scripts: RunScript[];
+}
+
 export interface RepoInfo {
   name: string;
   path: string;
@@ -27,4 +40,6 @@ export interface RepoInfo {
   git: GitInfo;
   health: RepoHealth;
   packages: PackageInfo | null;
+  scripts: RunScript[];
+  nested_projects: NestedProject[];
 }

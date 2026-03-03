@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { RepoInfo } from './types';
+import { RepoInfo, RunScript } from './types';
 import HealthSummary from './components/HealthSummary';
 import RepoList from './components/RepoList';
 import LoadingIndicator from './components/LoadingIndicator';
@@ -18,6 +18,7 @@ function App() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [runningProcesses, setRunningProcesses] = useState<Set<string>>(new Set());
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -47,6 +48,18 @@ function App() {
         setScanning(false);
       });
 
+      const unlistenProcessStarted = await listen<string>('process-started', (e) => {
+        setRunningProcesses((prev) => new Set(prev).add(e.payload));
+      });
+
+      const unlistenProcessStopped = await listen<string>('process-stopped', (e) => {
+        setRunningProcesses((prev) => {
+          const next = new Set(prev);
+          next.delete(e.payload);
+          return next;
+        });
+      });
+
       // Load persisted settings
       try {
         const { root_paths } = await invoke<{ root_paths: string[] }>('get_settings');
@@ -71,6 +84,8 @@ function App() {
         unlistenFound();
         unlistenComplete();
         unlistenError();
+        unlistenProcessStarted();
+        unlistenProcessStopped();
       };
     };
 
@@ -83,6 +98,16 @@ function App() {
       cleanup?.();
     };
   }, []);
+
+  const handleRunProject = (id: string, path: string, script: RunScript) => {
+    invoke('run_project', { id, path, command: script.command }).catch((e) =>
+      setError(String(e)),
+    );
+  };
+
+  const handleStopProject = (id: string) => {
+    invoke('stop_project', { id }).catch((e) => setError(String(e)));
+  };
 
   const handleSaveRootPaths = (paths: string[]) => {
     setRootPaths(paths);
@@ -145,6 +170,11 @@ function App() {
                 {scanning && (
                   <span className={styles.scanningBadge}>Scanning…</span>
                 )}
+                {runningProcesses.size > 0 && (
+                  <span className={styles.runningBadge}>
+                    {runningProcesses.size} running
+                  </span>
+                )}
                 {!scanning && repos.length > 0 && (
                   <span className={styles.count}>
                     {filtered.length}{' '}
@@ -157,7 +187,13 @@ function App() {
             {scanning && repos.length === 0 ? (
               <LoadingIndicator />
             ) : (
-              <RepoList repos={filtered} hasRootPaths={rootPaths.length > 0} />
+              <RepoList
+                repos={filtered}
+                hasRootPaths={rootPaths.length > 0}
+                runningProcesses={runningProcesses}
+                onRun={handleRunProject}
+                onStop={handleStopProject}
+              />
             )}
           </>
         )}
