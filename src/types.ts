@@ -83,4 +83,4 @@ export interface ProcessEntry {
   lines: OutputLine[];
 }
 
-export type View = 'repos' | 'running' | 'summary' | 'health' | 'deps' | 'settings';
+export type View = 'home' | 'repos' | 'running' | 'health' | 'deps' | 'settings';

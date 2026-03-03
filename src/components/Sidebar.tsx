@@ -16,9 +16,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
     items: [
+      { id: 'home', label: 'Home' },
       { id: 'repos', label: 'Repositories' },
       { id: 'running', label: 'Running' },
-      { id: 'summary', label: 'Summary' },
     ],
   },
   {

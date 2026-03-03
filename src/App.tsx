@@ -8,7 +8,7 @@ import RepoDetailDrawer from './components/RepoDetailDrawer';
 import HealthView from './components/HealthView';
 import DepsView from './components/DepsView';
 import RunningView from './components/RunningView';
-import HealthSummary from './components/HealthSummary';
+import DashboardView from './components/DashboardView';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorBanner from './components/ErrorBanner';
 import SettingsPage from './components/SettingsPage';
@@ -67,7 +67,7 @@ function normalizeRepo(raw: any): RepoInfo {
 
 
 function App() {
-  const [view, setView] = useState<View>('repos');
+  const [view, setView] = useState<View>('home');
   const [rootPaths, setRootPaths] = useState<string[]>([]);
   const [repos, setRepos] = useState<RepoInfo[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -228,11 +228,15 @@ function App() {
       );
     }
 
-    if (view === 'summary') {
+    if (view === 'home') {
       return (
-        <div className={styles.summaryPage}>
-          <HealthSummary repos={repos} scanning={scanning} />
-        </div>
+        <DashboardView
+          repos={repos}
+          runningCount={runningProcesses.size}
+          scanning={scanning}
+          onSelectRepo={(repo) => setSelectedRepo(repo)}
+          onNavigate={(v) => setView(v)}
+        />
       );
     }
 
