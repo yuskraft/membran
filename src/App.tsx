@@ -256,7 +256,15 @@ function App() {
     }
 
     if (view === 'mfe') {
-      return <MfeView repos={repos} onSelectRepo={(repo) => setSelectedRepo(repo)} />;
+      return (
+        <MfeView
+          repos={repos}
+          onSelectRepo={(repo) => setSelectedRepo(repo)}
+          runningProcesses={runningProcesses}
+          onRun={handleRunProject}
+          onStop={handleStopProject}
+        />
+      );
     }
 
     if (view === 'health') {
