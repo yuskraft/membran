@@ -8,6 +8,7 @@ interface Props {
   runningProcesses: Set<string>;
   onRun: (id: string, path: string, script: RunScript) => void;
   onStop: (id: string) => void;
+  onSelect: (repo: RepoInfo) => void;
 }
 
 export default function RepoList({
@@ -16,6 +17,7 @@ export default function RepoList({
   runningProcesses,
   onRun,
   onStop,
+  onSelect,
 }: Props) {
   if (!hasRootPaths) {
     return (
@@ -48,6 +50,7 @@ export default function RepoList({
           runningProcesses={runningProcesses}
           onRun={onRun}
           onStop={onStop}
+          onSelect={onSelect}
         />
       ))}
     </div>

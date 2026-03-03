@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { RepoInfo, RunScript } from './types';
-import HealthSummary from './components/HealthSummary';
+import { RepoInfo, RunScript, View } from './types';
+import Sidebar from './components/Sidebar';
 import RepoList from './components/RepoList';
+import RepoDetailDrawer from './components/RepoDetailDrawer';
+import HealthView from './components/HealthView';
+import DepsView from './components/DepsView';
+import HealthSummary from './components/HealthSummary';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorBanner from './components/ErrorBanner';
 import SettingsPage from './components/SettingsPage';
 import styles from './App.module.css';
-
-type View = 'repos' | 'settings';
 
 function App() {
   const [view, setView] = useState<View>('repos');
@@ -19,6 +21,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [runningProcesses, setRunningProcesses] = useState<Set<string>>(new Set());
+  const [selectedRepo, setSelectedRepo] = useState<RepoInfo | null>(null);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -26,13 +29,15 @@ function App() {
     initialized.current = true;
 
     const setup = async () => {
-      // Register event listeners before starting any scan
       const unlistenFound = await listen<RepoInfo>('repo-found', (e) => {
         setRepos((prev) => {
           const idx = prev.findIndex((r) => r.path === e.payload.path);
           if (idx >= 0) {
             const next = [...prev];
             next[idx] = e.payload;
+            setSelectedRepo((sel) =>
+              sel?.path === e.payload.path ? e.payload : sel,
+            );
             return next;
           }
           return [...prev, e.payload];
@@ -48,11 +53,11 @@ function App() {
         setScanning(false);
       });
 
-      const unlistenProcessStarted = await listen<string>('process-started', (e) => {
+      const unlistenStarted = await listen<string>('process-started', (e) => {
         setRunningProcesses((prev) => new Set(prev).add(e.payload));
       });
 
-      const unlistenProcessStopped = await listen<string>('process-stopped', (e) => {
+      const unlistenStopped = await listen<string>('process-stopped', (e) => {
         setRunningProcesses((prev) => {
           const next = new Set(prev);
           next.delete(e.payload);
@@ -60,13 +65,11 @@ function App() {
         });
       });
 
-      // Load persisted settings
       try {
         const { root_paths } = await invoke<{ root_paths: string[] }>('get_settings');
         setRootPaths(root_paths);
 
         if (root_paths.length > 0) {
-          // Show cached repos immediately while fresh scan runs
           const cached = await invoke<RepoInfo[]>('get_cached_repos').catch(() => []);
           if (cached.length > 0) setRepos(cached);
 
@@ -84,8 +87,8 @@ function App() {
         unlistenFound();
         unlistenComplete();
         unlistenError();
-        unlistenProcessStarted();
-        unlistenProcessStopped();
+        unlistenStarted();
+        unlistenStopped();
       };
     };
 
@@ -129,75 +132,98 @@ function App() {
       r.path.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const renderMain = () => {
+    if (view === 'settings') {
+      return <SettingsPage rootPaths={rootPaths} onSave={handleSaveRootPaths} />;
+    }
+
+    if (view === 'summary') {
+      return (
+        <div className={styles.summaryPage}>
+          <HealthSummary repos={repos} scanning={scanning} />
+        </div>
+      );
+    }
+
+    if (view === 'health') {
+      return (
+        <HealthView repos={repos} onSelectRepo={(repo) => setSelectedRepo(repo)} />
+      );
+    }
+
+    if (view === 'deps') {
+      return <DepsView repos={repos} />;
+    }
+
+    return (
+      <>
+        <div className={styles.toolbar}>
+          <input
+            className={styles.search}
+            type="text"
+            placeholder="Search repositories…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className={styles.toolbarRight}>
+            {scanning && (
+              <span className={styles.scanningBadge}>Scanning…</span>
+            )}
+            {runningProcesses.size > 0 && (
+              <span className={styles.runningBadge}>
+                {runningProcesses.size} running
+              </span>
+            )}
+            {!scanning && repos.length > 0 && (
+              <span className={styles.count}>
+                {filtered.length} {filtered.length === 1 ? 'repo' : 'repos'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {scanning && repos.length === 0 ? (
+          <LoadingIndicator />
+        ) : (
+          <RepoList
+            repos={filtered}
+            hasRootPaths={rootPaths.length > 0}
+            runningProcesses={runningProcesses}
+            onRun={handleRunProject}
+            onStop={handleStopProject}
+            onSelect={(repo) => setSelectedRepo(repo)}
+          />
+        )}
+      </>
+    );
+  };
+
   return (
     <div className={styles.layout}>
-      <aside className={styles.sidebar}>
-        <nav className={styles.nav}>
-          <button
-            className={`${styles.navBtn} ${view === 'repos' ? styles.navBtnActive : ''}`}
-            onClick={() => setView('repos')}
-          >
-            Repos
-          </button>
-          <button
-            className={`${styles.navBtn} ${view === 'settings' ? styles.navBtnActive : ''}`}
-            onClick={() => setView('settings')}
-          >
-            Settings
-          </button>
-        </nav>
-        <HealthSummary repos={repos} scanning={scanning} />
-      </aside>
+      <Sidebar
+        view={view}
+        repos={repos}
+        scanning={scanning}
+        runningCount={runningProcesses.size}
+        onViewChange={setView}
+      />
 
       <main className={styles.main}>
         {error && (
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         )}
-
-        {view === 'settings' ? (
-          <SettingsPage rootPaths={rootPaths} onSave={handleSaveRootPaths} />
-        ) : (
-          <>
-            <div className={styles.toolbar}>
-              <input
-                className={styles.search}
-                type="text"
-                placeholder="Search repositories…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <div className={styles.toolbarRight}>
-                {scanning && (
-                  <span className={styles.scanningBadge}>Scanning…</span>
-                )}
-                {runningProcesses.size > 0 && (
-                  <span className={styles.runningBadge}>
-                    {runningProcesses.size} running
-                  </span>
-                )}
-                {!scanning && repos.length > 0 && (
-                  <span className={styles.count}>
-                    {filtered.length}{' '}
-                    {filtered.length === 1 ? 'repo' : 'repos'}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {scanning && repos.length === 0 ? (
-              <LoadingIndicator />
-            ) : (
-              <RepoList
-                repos={filtered}
-                hasRootPaths={rootPaths.length > 0}
-                runningProcesses={runningProcesses}
-                onRun={handleRunProject}
-                onStop={handleStopProject}
-              />
-            )}
-          </>
-        )}
+        {renderMain()}
       </main>
+
+      {selectedRepo && (
+        <RepoDetailDrawer
+          repo={selectedRepo}
+          runningProcesses={runningProcesses}
+          onRun={handleRunProject}
+          onStop={handleStopProject}
+          onClose={() => setSelectedRepo(null)}
+        />
+      )}
     </div>
   );
 }

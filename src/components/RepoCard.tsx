@@ -9,6 +9,7 @@ interface RepoCardProps {
   runningProcesses: Set<string>;
   onRun: (id: string, path: string, script: RunScript) => void;
   onStop: (id: string) => void;
+  onSelect: (repo: RepoInfo) => void;
 }
 
 export default function RepoCard({
@@ -16,6 +17,7 @@ export default function RepoCard({
   runningProcesses,
   onRun,
   onStop,
+  onSelect,
 }: RepoCardProps) {
   const { name, path, git, health, packages, scripts, nested_projects } = repo;
   const totalDeps = packages ? packages.dep_count + packages.dev_dep_count : null;
@@ -23,7 +25,10 @@ export default function RepoCard({
   const isRunning = runningProcesses.has(path);
 
   return (
-    <div className={`${styles.card} ${isRunning ? styles.cardRunning : ''}`}>
+    <div
+      className={`${styles.card} ${isRunning ? styles.cardRunning : ''}`}
+      onClick={() => onSelect(repo)}
+    >
       <div className={styles.header}>
         <span className={styles.badge}>git</span>
         <span className={styles.name} title={name}>

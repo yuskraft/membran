@@ -70,7 +70,6 @@ fn run_project(
     app: tauri::AppHandle,
     processes: State<ProcessManager>,
 ) -> Result<(), String> {
-    // Stop any existing process for this id before starting a new one
     {
         let mut map = processes.0.lock().map_err(|e| e.to_string())?;
         if let Some(mut existing) = map.remove(&id) {
@@ -78,7 +77,6 @@ fn run_project(
         }
     }
 
-    // Parse the command into program + args
     let parts: Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {
         return Err("empty command".to_string());
@@ -123,6 +121,24 @@ fn get_running_processes(processes: State<ProcessManager>) -> Result<Vec<String>
     Ok(map.keys().cloned().collect())
 }
 
+/// Runs `npm outdated --json` in the given path and returns the parsed JSON.
+/// npm exits with code 1 when there are outdated packages — that is not an error.
+#[tauri::command]
+fn get_outdated_packages(path: String) -> Result<Value, String> {
+    let output = Command::new("npm")
+        .args(["outdated", "--json"])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| format!("failed to run npm outdated: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if stdout.trim().is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+
+    serde_json::from_str(&stdout).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -157,6 +173,7 @@ pub fn run() {
             run_project,
             stop_project,
             get_running_processes,
+            get_outdated_packages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
