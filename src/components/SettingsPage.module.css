@@ -37,6 +37,34 @@
   line-height: 1.6;
 }
 
+.checkboxRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox {
+  margin: 0;
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  font-size: 13px;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.checkboxDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
 .actions {
   display: flex;
 }
