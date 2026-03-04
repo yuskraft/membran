@@ -1,41 +1,40 @@
-.group {
+/* ── Card shell ────────────────────────────────── */
+.card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  transition: box-shadow 0.15s;
+  transition: box-shadow 0.15s, border-color 0.15s;
 }
 
-.group:hover {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+.card:hover {
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--accent) 40%);
 }
 
 @media (prefers-color-scheme: dark) {
-  .group:hover {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  .card:hover {
+    box-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+    border-color: color-mix(in srgb, var(--border) 50%, var(--accent) 50%);
   }
 }
 
-.row {
+/* ── Clickable inner area ──────────────────────── */
+.inner {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 14px 16px;
   cursor: pointer;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
+  transition: border-left-color 0.15s;
 }
 
-.rowRunning {
-  border-left-color: rgba(34, 197, 94, 0.7);
+.running {
+  border-left-color: var(--health-high);
 }
 
-@media (prefers-color-scheme: dark) {
-  .rowRunning {
-    border-left-color: rgba(74, 222, 128, 0.6);
-  }
-}
-
-/* ── Top line: name + meta ────────────────────── */
+/* ── Top row: name + run button ───────────────── */
 .top {
   display: flex;
   align-items: center;
@@ -43,7 +42,7 @@
   gap: 12px;
 }
 
-.namePart {
+.nameLine {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -52,8 +51,8 @@
 }
 
 .runDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--health-high);
   flex-shrink: 0;
@@ -62,7 +61,7 @@
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  50%       { opacity: 0.3; }
 }
 
 .name {
@@ -76,20 +75,20 @@
   min-width: 0;
 }
 
-.badge {
+.gitBadge {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--accent);
-  background: rgba(0, 112, 243, 0.12);
-  padding: 2px 6px;
+  background: rgba(0, 112, 243, 0.1);
+  padding: 1px 6px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
 @media (prefers-color-scheme: dark) {
-  .badge {
-    background: rgba(59, 130, 246, 0.18);
+  .gitBadge {
+    background: rgba(59, 130, 246, 0.16);
   }
 }
 
@@ -97,55 +96,41 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 2px 6px;
+  padding: 1px 6px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
-.mfeHost   { color: #2563eb; background: rgba(37,  99, 235, 0.12); }
-.mfeRemote { color: #16a34a; background: rgba(22, 163,  74, 0.12); }
-.mfeHub    { color: #7c3aed; background: rgba(124, 58, 237, 0.12); }
+.mfeHost   { color: #2563eb; background: rgba(37,  99, 235, 0.1); }
+.mfeRemote { color: #16a34a; background: rgba(22, 163,  74, 0.1); }
+.mfeHub    { color: #7c3aed; background: rgba(124, 58, 237, 0.1); }
 
 @media (prefers-color-scheme: dark) {
-  .mfeHost   { color: #60a5fa; background: rgba(96,  165, 250, 0.15); }
-  .mfeRemote { color: #4ade80; background: rgba(74,  222, 128, 0.15); }
-  .mfeHub    { color: #a78bfa; background: rgba(167, 139, 250, 0.15); }
+  .mfeHost   { color: #60a5fa; background: rgba(96,  165, 250, 0.14); }
+  .mfeRemote { color: #4ade80; background: rgba(74,  222, 128, 0.14); }
+  .mfeHub    { color: #a78bfa; background: rgba(167, 139, 250, 0.14); }
 }
 
-.metaPart {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.date {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.deps {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.healthWrap {
-  width: 56px;
-}
-
-/* ── Bottom line: path + git ──────────────────── */
+/* ── Bottom row: info line + meta ─────────────── */
 .bottom {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.infoLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
   min-width: 0;
 }
 
 .path {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -154,35 +139,55 @@
   min-width: 0;
 }
 
-.gitRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
 .branch {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--accent);
-  background: rgba(0, 112, 243, 0.09);
-  padding: 1px 7px;
-  border-radius: 8px;
+  background: rgba(0, 112, 243, 0.08);
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
   font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   .branch {
-    background: rgba(59, 130, 246, 0.14);
+    background: rgba(59, 130, 246, 0.12);
   }
 }
 
 .commit {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-style: italic;
-  max-width: 280px;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 220px;
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.healthWrap {
+  width: 48px;
+}
+
+.deps {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
