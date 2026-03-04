@@ -33,19 +33,19 @@ export default function RepoCard({
           : null;
 
   return (
-    <div className={styles.group}>
+    <div className={styles.card}>
       <div
-        className={`${styles.row} ${isRunning ? styles.rowRunning : ''}`}
+        className={`${styles.inner} ${isRunning ? styles.running : ''}`}
         onClick={() => onSelect(repo)}
       >
-        {/* Top line: name + badges (left) | meta (right) */}
+        {/* Top row: name + badges | run button */}
         <div className={styles.top}>
-          <div className={styles.namePart}>
+          <div className={styles.nameLine}>
             {isRunning && <span className={styles.runDot} />}
             <span className={styles.name} title={name}>
               {name}
             </span>
-            <span className={styles.badge}>git</span>
+            <span className={styles.gitBadge}>git</span>
             {mfeLabel && (
               <span
                 className={`${styles.mfeBadge} ${
@@ -60,44 +60,44 @@ export default function RepoCard({
               </span>
             )}
           </div>
-          <div className={styles.metaPart}>
-            {git.last_commit_date && (
-              <span className={styles.date}>{git.last_commit_date}</span>
+          {primaryScript && (
+            <RunButton
+              id={path}
+              path={path}
+              script={primaryScript}
+              isRunning={isRunning}
+              onRun={onRun}
+              onStop={onStop}
+            />
+          )}
+        </div>
+
+        {/* Bottom row: path + git info | health + meta */}
+        <div className={styles.bottom}>
+          <div className={styles.infoLine}>
+            <span className={styles.path} title={path}>
+              {path}
+            </span>
+            {git.branch && (
+              <span className={styles.branch}>{git.branch}</span>
             )}
-            {totalDeps !== null && (
-              <span className={styles.deps}>{totalDeps} deps</span>
+            {git.last_commit_msg && (
+              <span className={styles.commit} title={git.last_commit_msg}>
+                {git.last_commit_msg}
+              </span>
             )}
+          </div>
+          <div className={styles.metaLine}>
             <div className={styles.healthWrap}>
               <HealthBar score={health.score} showLabel={false} />
             </div>
-            {primaryScript && (
-              <RunButton
-                id={path}
-                path={path}
-                script={primaryScript}
-                isRunning={isRunning}
-                onRun={onRun}
-                onStop={onStop}
-              />
+            {totalDeps !== null && (
+              <span className={styles.deps}>{totalDeps} deps</span>
+            )}
+            {git.last_commit_date && (
+              <span className={styles.date}>{git.last_commit_date}</span>
             )}
           </div>
-        </div>
-
-        {/* Bottom line: path + git info */}
-        <div className={styles.bottom}>
-          <span className={styles.path} title={path}>
-            {path}
-          </span>
-          {(git.branch || git.last_commit_msg) && (
-            <div className={styles.gitRow}>
-              {git.branch && <span className={styles.branch}>{git.branch}</span>}
-              {git.last_commit_msg && (
-                <span className={styles.commit} title={git.last_commit_msg}>
-                  {git.last_commit_msg}
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

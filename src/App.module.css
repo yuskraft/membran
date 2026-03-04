@@ -12,14 +12,26 @@
   background: var(--main-bg);
 }
 
-/* Repos view toolbar */
+/* Repos view header (title + toolbar) */
+.reposHeader {
+  flex-shrink: 0;
+  padding: 20px 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.reposTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px 12px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  padding-bottom: 12px;
 }
 
 .search {

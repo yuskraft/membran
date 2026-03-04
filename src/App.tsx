@@ -279,28 +279,31 @@ function App() {
 
     return (
       <>
-        <div className={styles.toolbar}>
-          <input
-            className={styles.search}
-            type="text"
-            placeholder="Search repositories…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className={styles.toolbarRight}>
-            {scanning && (
-              <span className={styles.scanningBadge}>Scanning…</span>
-            )}
-            {runningProcesses.size > 0 && (
-              <span className={styles.runningBadge}>
-                {runningProcesses.size} running
-              </span>
-            )}
-            {!scanning && repos.length > 0 && (
-              <span className={styles.count}>
-                {filtered.length} {filtered.length === 1 ? 'repo' : 'repos'}
-              </span>
-            )}
+        <div className={styles.reposHeader}>
+          <h1 className={styles.reposTitle}>Repositories</h1>
+          <div className={styles.toolbar}>
+            <input
+              className={styles.search}
+              type="text"
+              placeholder="Search repositories…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className={styles.toolbarRight}>
+              {scanning && (
+                <span className={styles.scanningBadge}>Scanning…</span>
+              )}
+              {runningProcesses.size > 0 && (
+                <span className={styles.runningBadge}>
+                  {runningProcesses.size} running
+                </span>
+              )}
+              {!scanning && repos.length > 0 && (
+                <span className={styles.count}>
+                  {filtered.length} {filtered.length === 1 ? 'repo' : 'repos'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
