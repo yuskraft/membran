@@ -33,66 +33,72 @@ export default function RepoCard({
           : null;
 
   return (
-    <div
-      className={`${styles.card} ${isRunning ? styles.cardRunning : ''}`}
-      onClick={() => onSelect(repo)}
-    >
-      <div className={styles.header}>
-        <span className={styles.badge}>git</span>
-        {mfeLabel && (
-          <span
-            className={`${styles.mfeBadge} ${
-              mfeLabel === 'HOST'
-                ? styles.mfeHost
-                : mfeLabel === 'REMOTE'
-                  ? styles.mfeRemote
-                  : styles.mfeHub
-            }`}
-          >
-            {mfeLabel}
-          </span>
-        )}
-        <span className={styles.name} title={name}>
-          {name}
-        </span>
-        {primaryScript && (
-          <RunButton
-            id={path}
-            path={path}
-            script={primaryScript}
-            isRunning={isRunning}
-            onRun={onRun}
-            onStop={onStop}
-          />
-        )}
-      </div>
-
-      <span className={styles.path} title={path}>
-        {path}
-      </span>
-
-      {(git.branch || git.last_commit_msg) && (
-        <div className={styles.gitRow}>
-          {git.branch && <span className={styles.branch}>{git.branch}</span>}
-          {git.last_commit_msg && (
-            <span className={styles.commit} title={git.last_commit_msg}>
-              {git.last_commit_msg}
+    <div className={styles.group}>
+      <div
+        className={`${styles.row} ${isRunning ? styles.rowRunning : ''}`}
+        onClick={() => onSelect(repo)}
+      >
+        {/* Top line: name + badges (left) | meta (right) */}
+        <div className={styles.top}>
+          <div className={styles.namePart}>
+            {isRunning && <span className={styles.runDot} />}
+            <span className={styles.name} title={name}>
+              {name}
             </span>
+            <span className={styles.badge}>git</span>
+            {mfeLabel && (
+              <span
+                className={`${styles.mfeBadge} ${
+                  mfeLabel === 'HOST'
+                    ? styles.mfeHost
+                    : mfeLabel === 'REMOTE'
+                      ? styles.mfeRemote
+                      : styles.mfeHub
+                }`}
+              >
+                {mfeLabel}
+              </span>
+            )}
+          </div>
+          <div className={styles.metaPart}>
+            {git.last_commit_date && (
+              <span className={styles.date}>{git.last_commit_date}</span>
+            )}
+            {totalDeps !== null && (
+              <span className={styles.deps}>{totalDeps} deps</span>
+            )}
+            <div className={styles.healthWrap}>
+              <HealthBar score={health.score} showLabel={false} />
+            </div>
+            {primaryScript && (
+              <RunButton
+                id={path}
+                path={path}
+                script={primaryScript}
+                isRunning={isRunning}
+                onRun={onRun}
+                onStop={onStop}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Bottom line: path + git info */}
+        <div className={styles.bottom}>
+          <span className={styles.path} title={path}>
+            {path}
+          </span>
+          {(git.branch || git.last_commit_msg) && (
+            <div className={styles.gitRow}>
+              {git.branch && <span className={styles.branch}>{git.branch}</span>}
+              {git.last_commit_msg && (
+                <span className={styles.commit} title={git.last_commit_msg}>
+                  {git.last_commit_msg}
+                </span>
+              )}
+            </div>
           )}
         </div>
-      )}
-
-      {git.last_commit_date && (
-        <span className={styles.date}>last commit {git.last_commit_date}</span>
-      )}
-
-      <div className={styles.footer}>
-        <div className={styles.healthWrap}>
-          <HealthBar score={health.score} />
-        </div>
-        {totalDeps !== null && (
-          <span className={styles.deps}>{totalDeps} deps</span>
-        )}
       </div>
 
       <NestedProjectList

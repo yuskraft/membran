@@ -1,6 +1,8 @@
 .root {
   flex: 1;
+  min-height: 0; /* allow flex child to shrink so overflow-y: auto actually fires */
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
@@ -44,6 +46,7 @@
 .summary {
   font-size: 12px;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 /* ── Group card ── */
@@ -52,6 +55,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  flex-shrink: 0; /* must not shrink inside the scrollable flex-column .root */
 }
 
 /* ── Host row ── */
@@ -74,6 +78,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
   min-width: 0;
 }
 
@@ -91,6 +96,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .fedName {
@@ -101,6 +108,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .framework {
@@ -112,6 +120,7 @@
   padding: 2px 6px;
   border-radius: 4px;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 /* ── Remote rows ── */
@@ -164,6 +173,10 @@
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .remoteUrl {
@@ -173,14 +186,55 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  max-width: 200px;
+  flex-shrink: 0;
 }
 
-.unmatchedHint {
-  font-size: 10px;
+/* ── Unmatched-remotes collapsible group ── */
+.unmatchedGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.unmatchedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.unmatchedToggle:hover {
+  background: var(--badge-bg);
+}
+
+.unmatchedCount {
+  font-size: 11px;
   color: var(--text-muted);
   font-style: italic;
-  margin-left: 4px;
+  flex: 1;
+}
+
+.unmatchedChevron {
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  transform: rotate(0deg);
+}
+
+.unmatchedChevronOpen {
+  transform: rotate(90deg);
+}
+
+.unmatchedList {
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Mock server sub-rows ── */
@@ -321,6 +375,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 4px;
+  flex-shrink: 0; /* must not shrink inside the scrollable flex-column .root */
 }
 
 .standaloneTitle {
@@ -351,6 +406,8 @@
   padding: 10px 14px;
   cursor: pointer;
   transition: background 0.1s;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .standaloneRow:hover {
@@ -365,5 +422,6 @@
 .exposesHint {
   font-size: 11px;
   color: var(--text-muted);
-  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
 }

@@ -42,7 +42,7 @@ export default function RepoList({
   }
 
   return (
-    <div className={styles.grid}>
+    <div className={styles.list}>
       {repos.map((repo) => (
         <RepoCard
           key={repo.path}

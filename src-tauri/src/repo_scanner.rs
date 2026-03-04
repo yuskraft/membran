@@ -600,11 +600,34 @@ fn dir_bytes(dir: &Path) -> u64 {
 // ── Micro-frontend detection ──────────────────────────────────────────────────
 
 fn detect_mfe(path: &Path) -> Option<MfeInfo> {
+    // Standalone module-federation config files — don't require ModuleFederationPlugin.
+    // These are the dedicated config format used by @module-federation/enhanced and similar.
+    for file in &[
+        "module-federation.config.js",
+        "module-federation.config.ts",
+        "module-federation.config.mjs",
+        "module-federation.config.cjs",
+        "mf.config.js",
+        "mf.config.ts",
+    ] {
+        if let Ok(content) = fs::read_to_string(path.join(file)) {
+            if let Some(info) = parse_standalone_mfe_config(&content) {
+                return Some(info);
+            }
+        }
+    }
+
+    // Webpack / Rspack / Rsbuild configs — look for plugin invocations.
     for file in &[
         "webpack.config.js",
         "webpack.config.ts",
-        "module-federation.config.js",
-        "module-federation.config.ts",
+        "webpack.config.mjs",
+        "rspack.config.js",
+        "rspack.config.ts",
+        "rspack.config.mjs",
+        "rsbuild.config.ts",
+        "rsbuild.config.js",
+        "rsbuild.config.mjs",
     ] {
         if let Ok(content) = fs::read_to_string(path.join(file)) {
             if let Some(info) = parse_mfe_config(&content, "webpack") {
@@ -612,6 +635,8 @@ fn detect_mfe(path: &Path) -> Option<MfeInfo> {
             }
         }
     }
+
+    // Vite configs.
     for file in &["vite.config.ts", "vite.config.js", "vite.config.mjs"] {
         if let Ok(content) = fs::read_to_string(path.join(file)) {
             if let Some(info) = parse_mfe_config(&content, "vite") {
@@ -619,55 +644,145 @@ fn detect_mfe(path: &Path) -> Option<MfeInfo> {
             }
         }
     }
+
+    // Fallback: detect by package.json dependencies when config files have
+    // non-standard structures (e.g. dynamic imports, monorepo setups).
+    if let Ok(content) = fs::read_to_string(path.join("package.json")) {
+        if let Some(info) = detect_mfe_from_package_json(&content) {
+            return Some(info);
+        }
+    }
+
     None
 }
 
+/// Parse a standalone `module-federation.config.{js,ts}` file.
+/// These don't contain `ModuleFederationPlugin`; they export a plain config object
+/// with `name`, `remotes`, and/or `exposes` keys.
+fn parse_standalone_mfe_config(content: &str) -> Option<MfeInfo> {
+    let remotes_block = extract_js_block(content, "remotes");
+    let exposes_block = extract_js_block(content, "exposes");
+
+    // Require at least one of remotes/exposes to consider it an MFE config.
+    if remotes_block.is_none() && exposes_block.is_none() {
+        // Also accept array-format remotes: remotes: [...]
+        if !has_array_key(content, "remotes") {
+            return None;
+        }
+    }
+
+    let framework = infer_framework_from_content(content);
+    build_mfe_info(content, framework, remotes_block, exposes_block)
+}
+
+/// Parse webpack/vite/rspack/rsbuild config files that use a plugin invocation.
 fn parse_mfe_config(content: &str, framework: &str) -> Option<MfeInfo> {
     let is_mfe = if framework == "vite" {
         content.contains("federation(")
     } else {
+        // Webpack, Rspack, Rsbuild and @module-federation/enhanced patterns.
         content.contains("ModuleFederationPlugin")
+            || content.contains("pluginModuleFederation(")
+            || content.contains("moduleFederation(")
+            || content.contains("federationPlugin(")
     };
     if !is_mfe {
         return None;
     }
 
-    let remotes_block = extract_js_block(content, "remotes");
-    let exposes_block = extract_js_block(content, "exposes");
-    let is_host = remotes_block.is_some();
+    // Scope field extraction to the plugin's config object so we don't pick up
+    // `name:` / `remotes:` / `exposes:` from other parts of the webpack config
+    // (output settings, HtmlWebpackPlugin, optimization.splitChunks, etc.).
+    let plugin_block = extract_mfe_plugin_block(content, framework);
+    let scope = plugin_block.as_deref().unwrap_or(content);
+
+    let remotes_block = extract_js_block(scope, "remotes")
+        .or_else(|| extract_js_block(content, "remotes"));
+    let exposes_block = extract_js_block(scope, "exposes")
+        .or_else(|| extract_js_block(content, "exposes"));
+
+    let mut info = build_mfe_info(content, framework, remotes_block, exposes_block)?;
+    // Name must come from the plugin block, not the whole file.
+    info.name = extract_quoted_after_key(scope, "name");
+    Some(info)
+}
+
+/// Extract the inner `{ ... }` config object of the MFE plugin call.
+///
+/// For `new ModuleFederationPlugin({ name: 'x', remotes: {...} })` this returns
+/// `" name: 'x', remotes: {...} "` so callers can scope field extraction to it.
+fn extract_mfe_plugin_block(content: &str, framework: &str) -> Option<String> {
+    // Find the earliest plugin marker position.
+    let marker_pos = if framework == "vite" {
+        content.find("federation(")
+    } else {
+        [
+            "ModuleFederationPlugin(",
+            "pluginModuleFederation(",
+            "moduleFederation(",
+            "federationPlugin(",
+        ]
+        .iter()
+        .filter_map(|p| content.find(p))
+        .min()
+    }?;
+
+    let after = &content[marker_pos..];
+    // Skip to the opening paren of the call.
+    let paren = after.find('(')?;
+    let after_paren = after[paren + 1..].trim_start();
+    // The first non-whitespace char must be `{` (the config object).
+    if !after_paren.starts_with('{') {
+        return None;
+    }
+    let inner = &after_paren[1..];
+
+    // Brace-match to find the end of the config object.
+    let mut depth = 1i32;
+    let mut end = inner.len();
+    for (i, c) in inner.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = i;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let block = inner[..end].to_string();
+    if block.trim().is_empty() {
+        None
+    } else {
+        Some(block)
+    }
+}
+
+/// Build an MfeInfo from already-extracted blocks.
+fn build_mfe_info(
+    content: &str,
+    framework: &str,
+    remotes_block: Option<String>,
+    exposes_block: Option<String>,
+) -> Option<MfeInfo> {
+    // is_host: has a remotes object block OR an array-format remotes key.
+    let is_host = remotes_block.is_some() || has_array_key(content, "remotes");
     let is_remote = exposes_block.is_some();
 
-    let remotes = remotes_block
-        .map(|b| {
-            b.lines()
-                .filter_map(|line| {
-                    let (key, val) = extract_js_key_value(line.trim())?;
-                    let url = val
-                        .map(|v| {
-                            // Webpack format: "remoteName@https://host/remoteEntry.js"
-                            if let Some(at) = v.rfind('@') {
-                                v[at + 1..].to_string()
-                            } else {
-                                v
-                            }
-                        })
-                        .filter(|u| u.contains("://") || u.starts_with('/'));
-                    Some(MfeRemote { name: key, url })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    if !is_host && !is_remote {
+        return None;
+    }
 
+    let remotes = parse_remotes_block(content, remotes_block.as_deref());
     let exposes = exposes_block
         .map(|b| {
             b.lines()
                 .filter_map(|line| {
                     let (key, _) = extract_js_key_value(line.trim())?;
-                    if key.starts_with("./") || key.starts_with('/') {
-                        Some(key)
-                    } else {
-                        None
-                    }
+                    Some(key)
                 })
                 .collect()
         })
@@ -683,18 +798,186 @@ fn parse_mfe_config(content: &str, framework: &str) -> Option<MfeInfo> {
     })
 }
 
+/// Parse the `remotes` block, handling both object and array formats.
+fn parse_remotes_block(content: &str, block: Option<&str>) -> Vec<MfeRemote> {
+    // Object format: remotes: { name: "alias@url", ... }
+    if let Some(b) = block {
+        let mut remotes: Vec<MfeRemote> = b
+            .lines()
+            .filter_map(|line| {
+                let (key, val) = extract_js_key_value(line.trim())?;
+                let url = val
+                    .map(|v| {
+                        // Webpack "@" separator: "alias@https://host/remoteEntry.js"
+                        if let Some(at) = v.rfind('@') {
+                            v[at + 1..].to_string()
+                        } else {
+                            v
+                        }
+                    })
+                    .filter(|u| u.contains("://") || u.starts_with('/'));
+                Some(MfeRemote { name: key, url })
+            })
+            .collect();
+        if !remotes.is_empty() {
+            return remotes;
+        }
+        // Block existed but was empty — fall through to array detection.
+        remotes.clear();
+    }
+
+    // Array format: remotes: [{ name: "app", entry: "http://..." }, ...]
+    parse_array_remotes(content)
+}
+
+/// Detect `key: [` pattern (array-format remotes).
+fn has_array_key(content: &str, key: &str) -> bool {
+    for pattern in &[format!("\"{key}\""), format!("{key}")] {
+        if let Some(pos) = content.find(pattern.as_str()) {
+            let after = content[pos + pattern.len()..].trim_start_matches(':').trim_start();
+            if after.starts_with('[') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Parse `remotes: [{ name: "app", entry: "http://..." }]` array format
+/// used by `@module-federation/enhanced`.
+fn parse_array_remotes(content: &str) -> Vec<MfeRemote> {
+    // Find the start of the array.
+    let key_pos = content
+        .find("\"remotes\"")
+        .or_else(|| content.find("remotes"));
+    let Some(kp) = key_pos else {
+        return vec![];
+    };
+    let after_key = &content[kp..];
+    let colon_off = after_key.find(':').unwrap_or(0);
+    let after_colon = after_key[colon_off + 1..].trim_start();
+    if !after_colon.starts_with('[') {
+        return vec![];
+    }
+
+    // Extract the array block.
+    let inner_start = after_colon[1..].to_string();
+    let mut depth = 1i32;
+    let mut end = inner_start.len();
+    for (i, c) in inner_start.char_indices() {
+        match c {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = i;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let array_content = &inner_start[..end];
+
+    // Extract name/entry pairs from each object entry.
+    let mut remotes = Vec::new();
+    let mut remaining = array_content;
+    while let Some(obj_start) = remaining.find('{') {
+        let inner = &remaining[obj_start + 1..];
+        let mut obj_end = inner.len();
+        let mut d = 1i32;
+        for (i, c) in inner.char_indices() {
+            match c {
+                '{' => d += 1,
+                '}' => {
+                    d -= 1;
+                    if d == 0 {
+                        obj_end = i;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let obj = &inner[..obj_end];
+        let name = extract_quoted_after_key(obj, "name");
+        let entry = extract_quoted_after_key(obj, "entry")
+            .filter(|u| u.contains("://") || u.starts_with('/'));
+        if let Some(n) = name {
+            remotes.push(MfeRemote { name: n, url: entry });
+        }
+        remaining = &inner[obj_end..];
+    }
+    remotes
+}
+
+/// Try to infer the bundler framework from import/require patterns in the content.
+fn infer_framework_from_content(content: &str) -> &'static str {
+    if content.contains("@module-federation/vite")
+        || content.contains("@originjs/vite-plugin-federation")
+    {
+        "vite"
+    } else {
+        "webpack"
+    }
+}
+
+/// Detect MFE by the presence of known MFE packages in package.json.
+/// Used as a last-resort fallback when config files are non-standard.
+fn detect_mfe_from_package_json(content: &str) -> Option<MfeInfo> {
+    let mfe_packages = [
+        "@module-federation/enhanced",
+        "@module-federation/vite",
+        "@originjs/vite-plugin-federation",
+        "@module-federation/rsbuild-plugin",
+        "@module-federation/webpack-bundler-runtime",
+        "module-federation",
+    ];
+    let has_mfe = mfe_packages.iter().any(|pkg| content.contains(pkg));
+    if !has_mfe {
+        return None;
+    }
+
+    let framework = if content.contains("@module-federation/vite")
+        || content.contains("@originjs/vite-plugin-federation")
+    {
+        "vite"
+    } else {
+        "webpack"
+    };
+
+    // We know it's MFE but can't determine host/remote without reading the config.
+    // Mark as remote=true so it shows in the standalone section rather than being hidden.
+    Some(MfeInfo {
+        is_host: false,
+        is_remote: true,
+        framework: framework.to_string(),
+        name: None,
+        remotes: vec![],
+        exposes: vec![],
+    })
+}
+
 /// Find `key: { ... }` in JS/TS text and return the inner block.
-/// The `{` must appear within 80 bytes of the key to avoid false matches.
+/// The `{` must appear within 300 bytes of the key to accommodate comments
+/// and multiline formatting between the key and its opening brace.
 fn extract_js_block(content: &str, key: &str) -> Option<String> {
     let pos = content
         .find(&format!("\"{}\":", key))
         .or_else(|| content.find(&format!("{}:", key)))?;
-    // The opening '{' must be close to the key
-    let window_end = (pos + 80).min(content.len());
+    // The opening '{' must be reasonably close to the key.
+    let window_end = (pos + 300).min(content.len());
     let window = &content[pos..window_end];
+    // Ensure we don't pick up a '[' (array format) — that's handled separately.
     let brace_offset = window.find('{')?;
+    // Make sure there's no '[' before the '{' (which would mean array format).
+    if let Some(bracket_offset) = window.find('[') {
+        if bracket_offset < brace_offset {
+            return None;
+        }
+    }
     let after = &content[pos + brace_offset + 1..];
-    // Count matching braces
+    // Count matching braces.
     let mut depth = 1i32;
     let mut end = after.len();
     for (i, c) in after.char_indices() {

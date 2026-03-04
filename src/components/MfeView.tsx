@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { RepoInfo, MfeRemote, RunScript, NestedProject } from '../types';
 import styles from './MfeView.module.css';
 
@@ -21,14 +22,27 @@ interface MfeGroup {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Collapse separators and lowercase so camelCase / kebab-case / PascalCase all compare equal. */
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[-_\s.@/]/g, '');
+}
+
 function buildMfeGroups(repos: RepoInfo[]): { groups: MfeGroup[]; standalone: RepoInfo[] } {
   const mfeRepos = repos.filter((r) => r.mfe !== null);
 
+  // Build four lookup maps: exact and normalised, keyed by federation name and repo dir name.
   const byFedName = new Map<string, RepoInfo>();
   const byRepoName = new Map<string, RepoInfo>();
+  const byNormFedName = new Map<string, RepoInfo>();
+  const byNormRepoName = new Map<string, RepoInfo>();
+
   for (const repo of mfeRepos) {
-    if (repo.mfe?.name) byFedName.set(repo.mfe.name, repo);
+    if (repo.mfe?.name) {
+      byFedName.set(repo.mfe.name, repo);
+      byNormFedName.set(normalizeName(repo.mfe.name), repo);
+    }
     byRepoName.set(repo.name, repo);
+    byNormRepoName.set(normalizeName(repo.name), repo);
   }
 
   const grouped = new Set<string>();
@@ -37,10 +51,32 @@ function buildMfeGroups(repos: RepoInfo[]): { groups: MfeGroup[]; standalone: Re
   for (const repo of mfeRepos) {
     if (!repo.mfe?.is_host) continue;
     const remotes: ResolvedRemote[] = (repo.mfe.remotes ?? []).map((remote) => {
+      const norm = normalizeName(remote.name);
+
       const matched =
+        // 1. Exact federation name  (shareholderOperations === shareholderOperations)
         byFedName.get(remote.name) ??
+        // 2. Exact repo dir name    (shareholderOperations === shareholderOperations)
         byRepoName.get(remote.name) ??
-        repos.find((r) => r.name.toLowerCase() === remote.name.toLowerCase());
+        // 3. Case-insensitive dir name
+        repos.find((r) => r.name.toLowerCase() === remote.name.toLowerCase()) ??
+        // 4. Normalised federation name  (camelCase vs kebab: "shareHolderOps" === "share-holder-ops")
+        byNormFedName.get(norm) ??
+        // 5. Normalised repo dir name   ("abb-dashboard" normalises to "abbdashboard" === "abbdashboard")
+        byNormRepoName.get(norm) ??
+        // 6. Substring: "abb-shareholder-operations" ⊇ "shareholderoperations" (min 4 chars)
+        (norm.length >= 4
+          ? mfeRepos.find((r) => {
+              const normRepo = normalizeName(r.name);
+              const normFed = r.mfe?.name ? normalizeName(r.mfe.name) : '';
+              return (
+                normRepo.includes(norm) ||
+                norm.includes(normRepo) ||
+                (normFed.length >= 4 && (normFed.includes(norm) || norm.includes(normFed)))
+              );
+            })
+          : undefined);
+
       return { remote, repo: matched ?? null };
     });
     groups.push({ host: repo, remotes });
@@ -110,15 +146,28 @@ export default function MfeView({
   onStop,
 }: MfeViewProps) {
   const mfeRepos = repos.filter((r) => r.mfe !== null);
+  // Tracks which groups have their "not in scan" section expanded (keyed by host path).
+  const [expandedUnmatched, setExpandedUnmatched] = useState<Set<string>>(new Set());
+
+  const toggleUnmatched = (hostPath: string) =>
+    setExpandedUnmatched((prev) => {
+      const next = new Set(prev);
+      if (next.has(hostPath)) next.delete(hostPath);
+      else next.add(hostPath);
+      return next;
+    });
 
   if (mfeRepos.length === 0) {
     return (
       <div className={styles.empty}>
         <p className={styles.emptyTitle}>No micro-frontends detected</p>
         <p className={styles.emptyHint}>
-          Repos with a <code>webpack.config.js</code> containing{' '}
-          <code>ModuleFederationPlugin</code>, or a <code>vite.config.ts</code> using{' '}
-          <code>federation()</code>, will appear here.
+          Repos using Module Federation will appear here. Detected via:{' '}
+          <code>module-federation.config.{'{js,ts}'}</code>,{' '}
+          <code>webpack.config.js</code> with <code>ModuleFederationPlugin</code>,{' '}
+          <code>rspack.config.js</code>, <code>rsbuild.config.ts</code>,{' '}
+          <code>vite.config.ts</code> with <code>federation()</code>, or{' '}
+          <code>package.json</code> with <code>@module-federation/*</code> deps.
         </p>
       </div>
     );
@@ -192,88 +241,117 @@ export default function MfeView({
             </div>
 
             {/* Remote rows */}
-            {group.remotes.length > 0 && (
-              <div className={styles.remotes}>
-                {group.remotes.map(({ remote, repo }, i) => {
-                  const remoteRunning = repo ? runningProcesses.has(repo.path) : false;
-                  const mocks = repo ? getMockServers(repo) : [];
+            {group.remotes.length > 0 && (() => {
+              const matched = group.remotes.filter((r) => r.repo !== null);
+              const unmatched = group.remotes.filter((r) => r.repo === null);
+              const unmatchedOpen = expandedUnmatched.has(group.host.path);
 
-                  const handleRunRemote = (e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    if (!repo) return;
-                    if (remoteRunning) {
-                      onStop(repo.path);
-                    } else {
-                      // Run the remote + its mock servers + the host (as dependency)
-                      startRepoWithMocks(repo, runningProcesses, onRun);
-                      startRepoWithMocks(group.host, runningProcesses, onRun);
-                    }
-                  };
+              return (
+                <div className={styles.remotes}>
+                  {/* Matched remotes */}
+                  {matched.map(({ remote, repo }, i) => {
+                    const remoteRunning = runningProcesses.has(repo!.path);
+                    const mocks = getMockServers(repo!);
 
-                  return (
-                    <div key={remote.name + i} className={styles.remoteBlock}>
-                      <div
-                        className={`${styles.remoteRow} ${repo ? styles.remoteMatched : styles.remoteUnmatched}`}
-                        onClick={() => repo && onSelectRepo(repo)}
-                        role={repo ? 'button' : undefined}
-                        tabIndex={repo ? 0 : undefined}
-                        onKeyDown={
-                          repo ? (e) => e.key === 'Enter' && onSelectRepo(repo) : undefined
-                        }
-                      >
-                        <span className={styles.connector}>└──</span>
-                        <span className={`${styles.roleBadge} ${styles.badgeRemote}`}>REMOTE</span>
-                        <span className={styles.remoteName}>{repo ? repo.name : remote.name}</span>
-                        {remote.url && (
-                          <span className={styles.remoteUrl} title={remote.url}>
-                            {remote.url.replace(/^https?:\/\//, '')}
-                          </span>
-                        )}
-                        {!repo && <span className={styles.unmatchedHint}>not in scan</span>}
-                        {repo && (
+                    const handleRunRemote = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (remoteRunning) {
+                        onStop(repo!.path);
+                      } else {
+                        startRepoWithMocks(repo!, runningProcesses, onRun);
+                        startRepoWithMocks(group.host, runningProcesses, onRun);
+                      }
+                    };
+
+                    return (
+                      <div key={remote.name + i} className={styles.remoteBlock}>
+                        <div
+                          className={`${styles.remoteRow} ${styles.remoteMatched}`}
+                          onClick={() => onSelectRepo(repo!)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && onSelectRepo(repo!)}
+                        >
+                          <span className={styles.connector}>└──</span>
+                          <span className={`${styles.roleBadge} ${styles.badgeRemote}`}>REMOTE</span>
+                          <span className={styles.remoteName}>{repo!.name}</span>
+                          {remote.url && (
+                            <span className={styles.remoteUrl} title={remote.url}>
+                              {remote.url.replace(/^https?:\/\//, '')}
+                            </span>
+                          )}
                           <button
                             className={`${styles.runBtn} ${remoteRunning ? styles.runBtnStop : ''}`}
                             onClick={handleRunRemote}
-                            title={
-                              remoteRunning
-                                ? 'Stop remote'
-                                : `Run ${repo.name} + ${group.host.name} + mock servers`
-                            }
+                            title={remoteRunning ? 'Stop remote' : `Run ${repo!.name} + ${group.host.name} + mock servers`}
                           >
                             {remoteRunning ? '■' : '▶'}
                           </button>
-                        )}
-                        {remoteRunning && <span className={styles.runDot} />}
-                      </div>
+                          {remoteRunning && <span className={styles.runDot} />}
+                        </div>
 
-                      {/* Mock server sub-rows */}
-                      {mocks.map((mock) => {
-                        const mockRunning = runningProcesses.has(mock.id);
-                        return (
-                          <div key={mock.id} className={styles.mockRow}>
-                            <span className={styles.connectorInner}>    └──</span>
-                            <span className={styles.mockBadge}>mock</span>
-                            <span className={styles.mockName}>{mock.name}</span>
-                            {mockRunning && (
-                              <>
-                                <span className={styles.runDot} />
-                                <button
-                                  className={styles.runBtnStop}
-                                  onClick={(e) => { e.stopPropagation(); onStop(mock.id); }}
-                                  title={`Stop ${mock.name}`}
-                                >
-                                  ■
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
+                        {mocks.map((mock) => {
+                          const mockRunning = runningProcesses.has(mock.id);
+                          return (
+                            <div key={mock.id} className={styles.mockRow}>
+                              <span className={styles.connectorInner}>    └──</span>
+                              <span className={styles.mockBadge}>mock</span>
+                              <span className={styles.mockName}>{mock.name}</span>
+                              {mockRunning && (
+                                <>
+                                  <span className={styles.runDot} />
+                                  <button
+                                    className={styles.runBtnStop}
+                                    onClick={(e) => { e.stopPropagation(); onStop(mock.id); }}
+                                    title={`Stop ${mock.name}`}
+                                  >
+                                    ■
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Unmatched remotes — collapsed by default */}
+                  {unmatched.length > 0 && (
+                    <div className={styles.unmatchedGroup}>
+                      <button
+                        className={styles.unmatchedToggle}
+                        onClick={(e) => { e.stopPropagation(); toggleUnmatched(group.host.path); }}
+                        title={unmatchedOpen ? 'Hide remotes not found in scan' : 'Show remotes not found in scan'}
+                      >
+                        <span className={styles.connector}>└──</span>
+                        <span className={styles.unmatchedCount}>
+                          {unmatched.length} not in scan
+                        </span>
+                        <span className={`${styles.unmatchedChevron} ${unmatchedOpen ? styles.unmatchedChevronOpen : ''}`}>▶</span>
+                      </button>
+
+                      {unmatchedOpen && (
+                        <div className={styles.unmatchedList}>
+                          {unmatched.map(({ remote }, i) => (
+                            <div key={remote.name + i} className={`${styles.remoteRow} ${styles.remoteUnmatched}`}>
+                              <span className={styles.connectorInner}>    └──</span>
+                              <span className={`${styles.roleBadge} ${styles.badgeRemote}`}>REMOTE</span>
+                              <span className={styles.remoteName}>{remote.name}</span>
+                              {remote.url && (
+                                <span className={styles.remoteUrl} title={remote.url}>
+                                  {remote.url.replace(/^https?:\/\//, '')}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })}

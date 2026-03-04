@@ -1,25 +1,16 @@
 .section {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  border-top: 1px solid var(--border);
 }
 
 .sectionTitle {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 2px;
+  display: none;
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
 .item {
@@ -27,26 +18,31 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 8px;
-  border-radius: 5px;
-  background: var(--main-bg);
-  border: 1px solid transparent;
-  transition: border-color 0.15s;
+  min-height: 36px;
+  padding: 7px 16px 7px 36px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  transition: background 0.1s;
+}
+
+.item:first-child {
+  border-top: none;
 }
 
 .item:hover {
-  border-color: var(--border);
+  background: var(--main-bg);
 }
 
 .itemRunning {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.04);
+  border-left-color: rgba(34, 197, 94, 0.7);
+  padding-left: 33px;
 }
 
 @media (prefers-color-scheme: dark) {
   .itemRunning {
-    border-color: rgba(74, 222, 128, 0.25);
-    background: rgba(74, 222, 128, 0.05);
+    border-left-color: rgba(74, 222, 128, 0.6);
   }
 }
 
@@ -77,45 +73,14 @@
   text-transform: uppercase;
 }
 
-/* Type-specific badge colors */
-.type_mock {
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.12);
-}
-
-.type_node {
-  color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
-}
-
-.type_rust {
-  color: #b45309;
-  background: rgba(180, 83, 9, 0.1);
-}
-
-.type_docker {
-  color: #0284c7;
-  background: rgba(2, 132, 199, 0.1);
-}
+.type_mock   { color: #d97706; background: rgba(217, 119,   6, 0.12); }
+.type_node   { color: #16a34a; background: rgba( 22, 163,  74, 0.10); }
+.type_rust   { color: #b45309; background: rgba(180,  83,   9, 0.10); }
+.type_docker { color: #0284c7; background: rgba(  2, 132, 199, 0.10); }
 
 @media (prefers-color-scheme: dark) {
-  .type_mock {
-    color: #fbbf24;
-    background: rgba(251, 191, 36, 0.12);
-  }
-
-  .type_node {
-    color: #4ade80;
-    background: rgba(74, 222, 128, 0.1);
-  }
-
-  .type_rust {
-    color: #fb923c;
-    background: rgba(251, 146, 60, 0.1);
-  }
-
-  .type_docker {
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.1);
-  }
+  .type_mock   { color: #fbbf24; background: rgba(251, 191,  36, 0.12); }
+  .type_node   { color: #4ade80; background: rgba( 74, 222, 128, 0.10); }
+  .type_rust   { color: #fb923c; background: rgba(251, 146,  60, 0.10); }
+  .type_docker { color: #38bdf8; background: rgba( 56, 189, 248, 0.10); }
 }
