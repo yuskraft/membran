@@ -4,6 +4,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+  flex-shrink: 0;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
