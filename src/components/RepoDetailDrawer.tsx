@@ -3,11 +3,12 @@ import { RepoInfo, RunScript } from '../types';
 import GitHistoryPanel from './GitHistoryPanel';
 import HealthDetailPanel from './HealthDetailPanel';
 import DepPanel from './DepPanel';
+import ScriptsPanel from './ScriptsPanel';
 import RunButton from './RunButton';
 import NestedProjectList from './NestedProjectList';
 import styles from './RepoDetailDrawer.module.css';
 
-type Tab = 'git' | 'health' | 'deps';
+type Tab = 'scripts' | 'git' | 'health' | 'deps';
 
 interface RepoDetailDrawerProps {
   repo: RepoInfo;
@@ -75,19 +76,26 @@ export default function RepoDetailDrawer({
 
         {/* Tabs */}
         <div className={styles.tabs}>
-          {(['git', 'health', 'deps'] as Tab[]).map((t) => (
+          {(['scripts', 'health', 'deps', 'git'] as Tab[]).map((t) => (
             <button
               key={t}
               className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`}
               onClick={() => setTab(t)}
             >
-              {t === 'git' ? 'Git History' : t === 'health' ? 'Health' : 'Dependencies'}
+              {t === 'scripts'
+                ? 'Scripts'
+                : t === 'health'
+                  ? 'Health'
+                  : t === 'deps'
+                    ? 'Dependencies'
+                    : 'Git History'}
             </button>
           ))}
         </div>
 
         {/* Tab content */}
         <div className={styles.content}>
+          {tab === 'scripts' && <ScriptsPanel repo={repo} />}
           {tab === 'git' && <GitHistoryPanel commits={repo.git_log} />}
           {tab === 'health' && <HealthDetailPanel repo={repo} />}
           {tab === 'deps' && <DepPanel repo={repo} />}

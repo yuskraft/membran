@@ -1,0 +1,250 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+/* npm Scripts list */
+.scriptList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scriptRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  transition: background 0.12s;
+}
+
+.scriptRow:hover {
+  background: var(--badge-bg);
+}
+
+.runBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--accent);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.runBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--badge-bg);
+}
+
+.runBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.scriptName {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.scriptCmd {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Action buttons */
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actionBtn {
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.actionBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.actionBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Input rows */
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inputLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+.textInput {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.textInput:focus {
+  border-color: var(--accent);
+}
+
+/* Terminal */
+.terminal {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.terminalHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.terminalLabel {
+  flex: 1;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminalStatus {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.statusSpinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.statusSuccess {
+  color: var(--health-high);
+  font-size: 13px;
+}
+
+.statusFail {
+  color: var(--health-low);
+  font-size: 13px;
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.12s;
+}
+
+.clearBtn:hover {
+  color: var(--text-primary);
+}
+
+.terminalBody {
+  background: var(--card-bg);
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.line,
+.lineError,
+.lineRunning {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.line {
+  color: var(--text-primary);
+}
+
+.lineError {
+  color: #f87171;
+}
+
+.lineRunning {
+  color: var(--text-muted);
+  font-style: italic;
+}

@@ -226,6 +226,95 @@ fn get_running_processes(processes: State<ProcessManager>) -> Result<Vec<Process
     Ok(map.values().map(|p| p.info.clone()).collect())
 }
 
+#[tauri::command]
+fn run_task(task_id: String, path: String, command: Vec<String>, app: tauri::AppHandle) -> Result<(), String> {
+    if command.is_empty() {
+        return Err("empty command".to_string());
+    }
+    std::thread::spawn(move || {
+        let mut child = match Command::new(&command[0])
+            .args(&command[1..])
+            .current_dir(&path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(_) => {
+                let _ = app.emit(
+                    "task-done",
+                    serde_json::json!({"task_id": task_id, "success": false, "exit_code": -1}),
+                );
+                return;
+            }
+        };
+
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
+        let out_handle = stdout.map(|s| {
+            let (app2, id2) = (app.clone(), task_id.clone());
+            std::thread::spawn(move || {
+                for line in BufReader::new(s).lines().flatten() {
+                    let _ = app2.emit(
+                        "task-output",
+                        serde_json::json!({"task_id": id2, "line": line, "is_error": false}),
+                    );
+                }
+            })
+        });
+
+        let err_handle = stderr.map(|s| {
+            let (app2, id2) = (app.clone(), task_id.clone());
+            std::thread::spawn(move || {
+                for line in BufReader::new(s).lines().flatten() {
+                    let _ = app2.emit(
+                        "task-output",
+                        serde_json::json!({"task_id": id2, "line": line, "is_error": true}),
+                    );
+                }
+            })
+        });
+
+        let status = child.wait();
+        out_handle.map(|h| h.join());
+        err_handle.map(|h| h.join());
+
+        let code = status.map(|s| s.code().unwrap_or(0)).unwrap_or(-1);
+        let _ = app.emit(
+            "task-done",
+            serde_json::json!({"task_id": task_id, "success": code == 0, "exit_code": code}),
+        );
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn get_package_scripts(path: String) -> Result<Vec<serde_json::Value>, String> {
+    let pkg_path = std::path::Path::new(&path).join("package.json");
+    if !pkg_path.exists() {
+        return Ok(vec![]);
+    }
+    let content = std::fs::read_to_string(&pkg_path).map_err(|e| e.to_string())?;
+    let pkg: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    let scripts = pkg["scripts"]
+        .as_object()
+        .map(|map| {
+            map.iter()
+                .map(|(name, _)| {
+                    serde_json::json!({
+                        "name": name,
+                        "command": format!("npm run {name}")
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(scripts)
+}
+
 /// Runs `npm outdated --json` in the given path and returns the parsed JSON.
 /// npm exits with code 1 when there are outdated packages — that is not an error.
 #[tauri::command]
@@ -306,6 +395,8 @@ pub fn run() {
             get_running_processes,
             get_outdated_packages,
             open_url,
+            run_task,
+            get_package_scripts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
